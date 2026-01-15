@@ -43,15 +43,11 @@ static void Output_Dequantize(AppConfig_TypeDef* );
  * @brief Run preprocessing stages on captured frame
  * @param App_Config_Ptr pointer to application context
  */
-/**
- * @brief Run preprocessing stages on captured frame
- * @param App_Config_Ptr pointer to application context
- */
 void Network_Preprocess(AppConfig_TypeDef *App_Config_Ptr)
-{ 
+{
   image_t src_img;
   image_t dst_img;
-  
+
   App_Config_Ptr->Tfps_start =Utility_GetTimeStamp();
 
   src_img.data=App_Config_Ptr->camera_capture_buffer;
@@ -67,24 +63,24 @@ void Network_Preprocess(AppConfig_TypeDef *App_Config_Ptr)
   dst_img.w=AI_NETWORK_WIDTH;
   dst_img.h=AI_NETWORK_HEIGHT;
   dst_img.bpp=IMAGE_BPP_RGB565;
-  
+
   /**********************/
   /****Image resizing****/
   /**********************/
   ImageResize(&src_img, &dst_img);
-  
+
   if(App_Config_Ptr->PixelFormatConv == HW_PFC)
     /******************************************************************************************/
     /****Coherency purpose: clean the source buffer area in L1 D-Cache before DMA2D reading****/
     /******************************************************************************************/
     Utility_DCache_Coherency_Maintenance((void *)(App_Config_Ptr->rescaled_image_buffer), RESCALED_FRAME_BUFFER_SIZE, CLEAN);
-  
+
 
   src_img.data=App_Config_Ptr->rescaled_image_buffer;
   src_img.w=AI_NETWORK_WIDTH;
   src_img.h=AI_NETWORK_HEIGHT;
   src_img.bpp=IMAGE_BPP_RGB565;
-  dst_img.data=App_Config_Ptr->nn_input_buffer;
+  dst_img.data=App_Config_Ptr->nn_input_buffer[0];
   dst_img.w=AI_NETWORK_WIDTH;
   dst_img.h=AI_NETWORK_HEIGHT;
 
@@ -97,12 +93,12 @@ void Network_Preprocess(AppConfig_TypeDef *App_Config_Ptr)
 #else
  #error Color format no supported
 #endif
-  
+
   /*************************************/
   /****Image Pixel Format Conversion****/
   /*************************************/
   PixelFormatConversion(App_Config_Ptr, &src_img, &dst_img);
-  
+
   if(App_Config_Ptr->PixelFormatConv == HW_PFC)
   {
     /**************************************************************************************/
@@ -112,7 +108,7 @@ void Network_Preprocess(AppConfig_TypeDef *App_Config_Ptr)
 										AI_NETWORK_INPUTS_IN_ACTIVATIONS_SIZE + 32 - (AI_NETWORK_INPUTS_IN_ACTIVATIONS_SIZE%32),
 									   INVALIDATE);
   }
-  
+
   /***********************************************************/
   /*********Pixel value convertion and normalisation**********/
   /***********************************************************/
@@ -127,12 +123,12 @@ void Network_Preprocess(AppConfig_TypeDef *App_Config_Ptr)
 void Network_Inference(AppConfig_TypeDef *App_Config_Ptr)
 {
   App_Config_Ptr->Tinf_start =Utility_GetTimeStamp();
-  
+
   /***********************************/
   /*********Run NN inference**********/
   /***********************************/
-  ai_run((void*)App_Config_Ptr->nn_input_buffer, (void**)App_Config_Ptr->nn_output_buffer);
-  
+  ai_run();
+
   App_Config_Ptr->Tinf_stop =Utility_GetTimeStamp();
 }
 
@@ -142,11 +138,11 @@ void Network_Inference(AppConfig_TypeDef *App_Config_Ptr)
  */
 void Network_Postprocess(AppConfig_TypeDef *App_Config_Ptr)
 {
-  /*** At that point, it is recommended to wait until current camera acquisition is completed  
+  /*** At that point, it is recommended to wait until current camera acquisition is completed
   *** before proceeding in order to avoid bottleneck at FMC slave (btw LTDC/DMA2D and DMA).
   ***/
   while(App_Config_Ptr->new_frame_ready == 0);
-  
+
   /**NN ouput dequantization if required**/
   Output_Dequantize(App_Config_Ptr);
 
@@ -174,9 +170,9 @@ void Network_Postprocess(AppConfig_TypeDef *App_Config_Ptr)
 /**
  * @brief De-initializes the generated C model for a neural network
  */
-void Network_Deinit(void) 
-{ 
-  ai_deinit(); 
+void Network_Deinit(void)
+{
+  ai_deinit();
 }
 
 /**
@@ -186,17 +182,17 @@ void Network_Deinit(void)
   */
 void Network_Init(AppConfig_TypeDef *App_Config_Ptr)
 {
-  void *input_data_ptr;
-  void *output_data_ptr[AI_NETWORK_OUT_NUM];
-  
-  ai_init((void*)(App_Config_Ptr->activation_buffer), &input_data_ptr, output_data_ptr);
-  
-  if(input_data_ptr!= NULL)
-    App_Config_Ptr->nn_input_buffer=input_data_ptr;
+  stai_ptr input_data_ptr[STAI_NETWORK_IN_NUM] = {NULL};
+  stai_ptr output_data_ptr[STAI_NETWORK_OUT_NUM] = {NULL};
+
+  ai_init((uint8_t**)(App_Config_Ptr->activation_buffer), input_data_ptr, output_data_ptr);
+
+  if(input_data_ptr[0] != NULL)
+    App_Config_Ptr->nn_input_buffer[0]=input_data_ptr[0];
   else
     while(1);
-  
-  for (uint8_t i = 0; i < AI_NETWORK_OUT_NUM; i++)
+
+  for (uint8_t i = 0; i < STAI_NETWORK_OUT_NUM; i++)
   {
     if(output_data_ptr[i]!= NULL)
     {
@@ -204,9 +200,9 @@ void Network_Init(AppConfig_TypeDef *App_Config_Ptr)
     }
     else
     {
-      while (1);     
+      while (1);
     }
-  } 
+  }
 }
 
 /**
@@ -224,14 +220,14 @@ static void Output_Dequantize(AppConfig_TypeDef *App_Config_Ptr)
     ai_i8 *nn_output_i8;
     ai_u8 *nn_output_u8;
     float *nn_output_f32;
-    
+
     /*Check what type of quantization scheme is used for the output*/
     switch(ai_get_output_quantization_scheme())
     {
     case AI_FXP_Q:
-      
+
       scale=ai_get_output_fxp_scale();
-      
+
       /* Dequantize NN output - in-place 8-bit to float conversion */
       nn_output_i8 = (ai_i8 *) App_Config_Ptr->nn_output_buffer[0];
       nn_output_f32 = (float *) App_Config_Ptr->nn_output_buffer[0];
@@ -241,12 +237,12 @@ static void Output_Dequantize(AppConfig_TypeDef *App_Config_Ptr)
         *(nn_output_f32 + i) = scale * q_value;
       }
       break;
-      
+
     case AI_UINT_Q:
-      
+
       scale = ai_get_output_scale();
       zero_point = ai_get_output_zero_point();
-      
+
       /* Dequantize NN output - in-place 8-bit to float conversion */
       nn_output_u8 = (ai_u8 *) App_Config_Ptr->nn_output_buffer[0];
       nn_output_f32 = (float *) App_Config_Ptr->nn_output_buffer[0];
@@ -256,12 +252,12 @@ static void Output_Dequantize(AppConfig_TypeDef *App_Config_Ptr)
         *(nn_output_f32 + i) = scale * (q_value - zero_point);
       }
       break;
-      
+
     case AI_SINT_Q:
-      
+
       scale = ai_get_output_scale();
       zero_point = ai_get_output_zero_point();
-      
+
       /* Dequantize NN output - in-place 8-bit to float conversion */
       nn_output_i8 = (ai_i8 *) App_Config_Ptr->nn_output_buffer[0];
       nn_output_f32 = (float *) App_Config_Ptr->nn_output_buffer[0];
@@ -271,10 +267,10 @@ static void Output_Dequantize(AppConfig_TypeDef *App_Config_Ptr)
         *(nn_output_f32 + i) = scale * (q_value - zero_point);
       }
       break;
-      
+
     default:
       break;
-    }  
+    }
   }
 }
 
@@ -302,11 +298,11 @@ static void PixelFormatConversion(AppConfig_TypeDef *App_Config_Ptr, image_t *sr
   image_t *src_img = src;
   image_t *dst_img = dst;
   uint32_t rb_swap = App_Config_Ptr->red_blue_swap;
-  
+
   switch (App_Config_Ptr->PixelFormatConv)
   {
   case HW_PFC: /* Use DMA2D to perform pixel format convertion from RGB565 to RGB888 */
-    
+
     if((src_img->bpp == IMAGE_BPP_RGB565) && (dst_img->bpp == IMAGE_BPP_RGB888))
     {
       /* DMA2D transfer with PFC */
@@ -341,24 +337,24 @@ static void PixelFormatConversion(AppConfig_TypeDef *App_Config_Ptr, image_t *sr
     {
       while (1);
     }
-    
+
     break;
-    
+
   case SW_PFC: /* Use SW routine to perform pixel format convertion from RGB565 to grayscale */
-   
+
     if (rb_swap != 0)
     {
       uint32_t nb_pixels = dst_img->w * dst_img->h;
       Pixel_RB_Swap(src_img->data, dst_img->data, nb_pixels);
     }
-    
+
     if (STM32Ipl_ConvertRev(src_img, dst_img, 0) != stm32ipl_err_Ok)
     {
       while (1);
     }
     break;
-    
-    
+
+
   default:
     while(1);
     break;
@@ -377,21 +373,21 @@ static void Pixel_RB_Swap(void *pSrc, void *pDst, uint32_t pixels)
   {
     uint8_t r, g, b;
   };
-  
+
   struct rgb_Dst
   {
     uint8_t r, g, b;
   };
-  
+
   uint8_t tmp_r;
-  
+
   struct rgb_Src *pivot = (struct rgb_Src *) pSrc;
   struct rgb_Dst *dest = (struct rgb_Dst *) pDst;
-  
+
   for (int i = pixels-1; i >= 0; i--)
   {
     tmp_r=pivot[i].r;
-    
+
     dest[i].r = pivot[i].b;
     dest[i].b = tmp_r;
     dest[i].g = pivot[i].g;

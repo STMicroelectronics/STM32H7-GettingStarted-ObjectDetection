@@ -28,23 +28,23 @@ extern "C"
 /* Includes ------------------------------------------------------------------*/
 #include "network.h"
 #include "network_data.h"
+#include "ai_platform.h"
 
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
 /* External variables --------------------------------------------------------*/
 /* Exported macros -----------------------------------------------------------*/
-#define AI_NET_INPUT_SIZE AI_NETWORK_IN_1_SIZE
-#define AI_NET_INPUT_SIZE_BYTES AI_NETWORK_IN_1_SIZE_BYTES
+#define AI_NET_INPUT_SIZE STAI_NETWORK_IN_1_SIZE
+#define AI_NET_INPUT_SIZE_BYTES STAI_NETWORK_IN_1_SIZE_BYTES
 
-#define AI_NET_OUTPUT_SIZE AI_NETWORK_OUT_1_SIZE
-#define AI_NET_OUTPUT_SIZE_BYTES AI_NETWORK_OUT_1_SIZE_BYTES
-
-#define AI_ACTIVATION_SIZE_BYTES_TOTAL AI_NETWORK_DATA_ACTIVATIONS_SIZE
-#define AI_ACTIVATION_SIZE_BYTES AI_NETWORK_DATA_ACTIVATIONS_SIZE
-#define AI_ACTIVATION_1_SIZE_BYTES AI_NETWORK_DATA_ACTIVATION_1_SIZE
-#define AI_ACTIVATION_2_SIZE_BYTES AI_NETWORK_DATA_ACTIVATION_2_SIZE
-#define AI_ACTIVATION_3_SIZE_BYTES AI_NETWORK_DATA_ACTIVATION_3_SIZE
-#define AI_ACTIVATION_BUFFERS_COUNT AI_NETWORK_DATA_ACTIVATIONS_COUNT
+#define AI_NET_OUTPUT_SIZE STAI_NETWORK_OUT_1_SIZE
+#define AI_NET_OUTPUT_SIZE_BYTES STAI_NETWORK_OUT_1_SIZE_BYTES
+#define AI_ACTIVATION_SIZE_BYTES_TOTAL STAI_NETWORK_ACTIVATIONS_SIZE_BYTES
+#define AI_ACTIVATION_SIZE_BYTES STAI_NETWORK_ACTIVATIONS_SIZE
+#define AI_ACTIVATION_1_SIZE_BYTES STAI_NETWORK_ACTIVATION_1_SIZE
+#define AI_ACTIVATION_2_SIZE_BYTES STAI_NETWORK_ACTIVATION_2_SIZE
+#define AI_ACTIVATION_3_SIZE_BYTES STAI_NETWORK_ACTIVATION_3_SIZE
+#define AI_ACTIVATION_BUFFERS_COUNT STAI_NETWORK_ACTIVATIONS_NUM
 
  /*** @GENERATED CODE START - DO NOT TOUCH@ ***/
 #define AI_NETWORK_INPUTS_IN_ACTIVATIONS_INDEX 0
@@ -53,14 +53,14 @@ extern "C"
  /*** @GENERATED CODE STOP - DO NOT TOUCH@ ***/
 
 
-#define AI_WEIGHT_SIZE_BYTES      AI_NETWORK_DATA_WEIGHTS_SIZE
+#define AI_WEIGHT_SIZE_BYTES      STAI_NETWORK_WEIGHTS_SIZE_BYTES
 
 #define AI_NETWORK_IN_SHIFT   1
 #define AI_NETWORK_OUT_SHIFT  7
 
-#define AI_NETWORK_WIDTH    AI_NETWORK_IN_1_WIDTH
-#define AI_NETWORK_HEIGHT   AI_NETWORK_IN_1_HEIGHT
-#define AI_NETWORK_CHANNEL  AI_NETWORK_IN_1_CHANNEL
+#define AI_NETWORK_WIDTH    STAI_NETWORK_IN_1_WIDTH
+#define AI_NETWORK_HEIGHT   STAI_NETWORK_IN_1_HEIGHT
+#define AI_NETWORK_CHANNEL  STAI_NETWORK_IN_1_CHANNEL
 
 /*********Quantization scheme******************/
 #define AI_FXP_Q          (0x0) /*Fixed Point Qm,n*/
@@ -76,12 +76,12 @@ ai_float ai_get_output_scale(void);
 ai_i32 ai_get_output_zero_point(void);
 uint32_t ai_get_input_quantization_scheme(void);
 uint32_t ai_get_output_quantization_scheme(void);
-ai_size ai_get_output_format(void);
-ai_size ai_get_input_format(void);
+stai_format ai_get_output_format(void);
+stai_format ai_get_input_format(void);
 
-void ai_init(void**, ai_handle*, ai_handle*);
+void ai_init(uint8_t** activation_buffer, stai_ptr* inputs_buff_Ptr, stai_ptr* outputs_buff_Ptr);
 void ai_deinit(void);
-void ai_run(void*, void**);
+void ai_run(void);
 
 #ifdef __cplusplus
 }

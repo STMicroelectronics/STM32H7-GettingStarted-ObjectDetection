@@ -25,34 +25,24 @@
 /* Private defines -----------------------------------------------------------*/
 /* Private macros ------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-static ai_handle network_handle;
-
-/* Array of pointer to manage the model's input/output tensors */
-static ai_buffer *ai_input;
-static ai_buffer *ai_output;
-
-/* Global variables ----------------------------------------------------------*/
-/* Private function prototypes -----------------------------------------------*/
-/* Functions Definition ------------------------------------------------------*/
+STAI_NETWORK_CONTEXT_DECLARE(network, STAI_NETWORK_CONTEXT_SIZE)
 
 /**
  * @brief Returns the input format type
- * @retval ai_size Input format type: quantized (AI_BUFFER_FMT_TYPE_Q) or float (AI_BUFFER_FMT_TYPE_FLOAT)
+ * @retval stai_format Input format type: quantized (STAI_FORMAT_Q) or float (STAI_FORMAT_FLOAT32)
  */
-ai_size ai_get_input_format(void)
+stai_format ai_get_input_format(void)
 {
-  ai_buffer_format fmt = AI_BUFFER_FORMAT(&ai_input[0]);
-  return AI_BUFFER_FMT_GET_TYPE(fmt);
+  return STAI_NETWORK_IN_1_FORMAT;
 }
 
 /**
  * @brief Returns the output format type
- * @retval ai_size Output format type: quantized (AI_BUFFER_FMT_TYPE_Q) or float (AI_BUFFER_FMT_TYPE_FLOAT)
+ * @retval stai_format Output format type: quantized (STAI_FORMAT_Q) or float (STAI_FORMAT_FLOAT32)
  */
-ai_size ai_get_output_format(void)
+stai_format ai_get_output_format(void)
 {
-  ai_buffer_format fmt = AI_BUFFER_FORMAT(&ai_output[0]);
-  return AI_BUFFER_FMT_GET_TYPE(fmt);
+  return STAI_NETWORK_OUT_1_FORMAT;
 }
 
 /**
@@ -61,8 +51,8 @@ ai_size ai_get_output_format(void)
  */
 ai_size ai_get_input_quantized_format(void)
 {
-  ai_buffer_format fmt = AI_BUFFER_FORMAT(&ai_input[0]);
-  return (AI_BUFFER_FMT_GET_BITS(fmt) - AI_BUFFER_FMT_GET_SIGN(fmt) - AI_BUFFER_FMT_GET_FBITS(fmt));
+  stai_format fmt = ai_get_input_format();
+  return STAI_FORMAT_GET_IBITS(fmt);
 }
 
 /**
@@ -71,11 +61,11 @@ ai_size ai_get_input_quantized_format(void)
  */
 uint32_t ai_get_input_quantization_scheme(void)
 {
-  ai_float scale=ai_get_input_scale();
-  
-  ai_buffer_format fmt=AI_BUFFER_FORMAT(&ai_input[0]);
-  ai_size sign = AI_BUFFER_FMT_GET_SIGN(fmt);  
-  
+  ai_float scale = ai_get_input_scale();
+
+  stai_format fmt = ai_get_input_format();
+  ai_size sign = STAI_FORMAT_GET_SIGN(fmt);
+
   if(scale==0)
   {
     return AI_FXP_Q;
@@ -99,11 +89,11 @@ uint32_t ai_get_input_quantization_scheme(void)
  */
 uint32_t ai_get_output_quantization_scheme(void)
 {
-  ai_float scale=ai_get_output_scale();
-  
-  ai_buffer_format fmt=AI_BUFFER_FORMAT(&ai_output[0]);
-  ai_size sign = AI_BUFFER_FMT_GET_SIGN(fmt);  
-  
+  ai_float scale = ai_get_output_scale();
+
+  stai_format fmt = ai_get_output_format();
+  ai_size sign = STAI_FORMAT_GET_SIGN(fmt);
+
   if(scale==0)
   {
     return AI_FXP_Q;
@@ -129,14 +119,13 @@ uint32_t ai_get_output_quantization_scheme(void)
 ai_float ai_get_output_fxp_scale(void)
 {
   float scale;
-  ai_buffer_format fmt_1;
-  
+
   /* Retrieve format of the output tensor - index 0 */
-  fmt_1 = AI_BUFFER_FORMAT(&ai_output[0]);
-  
+  stai_format fmt = ai_get_output_format();
+
   /* Build the scale factor for conversion */
-  scale = 1.0f / (0x1U << AI_BUFFER_FMT_GET_FBITS(fmt_1));
-  
+  scale = 1.0f / (0x1U << STAI_FORMAT_GET_FBITS(fmt));
+
   return scale;
 }
 
@@ -146,7 +135,7 @@ ai_float ai_get_output_fxp_scale(void)
  */
 ai_float ai_get_input_scale(void)
 {
-  return AI_BUFFER_META_INFO_INTQ_GET_SCALE(ai_input[0].meta_info, 0);
+  return STAI_NETWORK_IN_1_SCALE;
 }
 
 /**
@@ -155,7 +144,7 @@ ai_float ai_get_input_scale(void)
  */
 ai_i32 ai_get_input_zero_point(void)
 {
-  return AI_BUFFER_META_INFO_INTQ_GET_ZEROPOINT(ai_input[0].meta_info, 0);
+  return STAI_NETWORK_IN_1_ZERO_POINT;
 }
 
 /**
@@ -164,7 +153,11 @@ ai_i32 ai_get_input_zero_point(void)
  */
 ai_float ai_get_output_scale(void)
 {
-  return AI_BUFFER_META_INFO_INTQ_GET_SCALE(ai_output[0].meta_info, 0);
+#ifdef  STAI_NETWORK_OUT_1_SCALE
+  return STAI_NETWORK_OUT_1_SCALE;
+#else
+  return -1;
+#endif
 }
 
 
@@ -174,64 +167,63 @@ ai_float ai_get_output_scale(void)
  */
 ai_i32 ai_get_output_zero_point(void)
 {
-  return AI_BUFFER_META_INFO_INTQ_GET_ZEROPOINT(ai_output[0].meta_info, 0);
+#ifdef  STAI_NETWORK_OUT_1_ZERO_POINT
+  return STAI_NETWORK_OUT_1_ZERO_POINT;
+#else
+  return -1;
+#endif
 }
-
 
 /**
  * @brief Initializes the generated C model for a neural network
  * @param  activation_buffer Pointer to the activation buffer (i.e. working buffer used during NN inference)
  * @retval ai_handle
  */
-void ai_init(void** activation_buffer, ai_handle* inputs_buff_Ptr, ai_handle* outputs_buff_Ptr)
+void ai_init(uint8_t** activation_buffer, stai_ptr* inputs_buff_Ptr, stai_ptr* outputs_buff_Ptr)
 {
-  network_handle = AI_HANDLE_NULL;
-  
-  /* Create and initialize the c-model */
-#if AI_NETWORK_DATA_ACTIVATIONS_COUNT == 1
-  const ai_handle acts[] = { activation_buffer[0] };
-#elif AI_NETWORK_DATA_ACTIVATIONS_COUNT == 2
-  const ai_handle acts[] = { activation_buffer[0], activation_buffer[1] };
-#elif AI_NETWORK_DATA_ACTIVATIONS_COUNT == 3
-  const ai_handle acts[] = { activation_buffer[0], activation_buffer[1], activation_buffer[2] };
-#endif
-  ai_network_create_and_init(&network_handle, acts, NULL);
-  uint16_t size_output = 0;
-  
-  /* Retrieve pointers to the model's input/output tensors */
-  ai_input = ai_network_inputs_get(network_handle, NULL);
-  ai_output = ai_network_outputs_get(network_handle, &size_output);
+  stai_return_code err;
+  stai_size ai_input_size = 0;
+  stai_size ai_output_size = 0;
 
-  /*Initialize the input and output buffer pointers*/
-  *inputs_buff_Ptr=ai_input[0].data;  
-  for (uint8_t i = 0; i < AI_NETWORK_OUT_NUM; i++)
-  {
-    outputs_buff_Ptr[i]=ai_output[i].data;
-  }
+  err = stai_runtime_init();
+  assert(err == STAI_SUCCESS);
+
+  err = stai_network_init(network);
+  assert(err == STAI_SUCCESS);
+  /* Create and initialize the c-model */
+#if AI_ACTIVATION_BUFFERS_COUNT == 1
+  const stai_ptr acts[] = { activation_buffer[0] };
+#elif AI_ACTIVATION_BUFFERS_COUNT == 2
+  const stai_ptr acts[] = { activation_buffer[0], activation_buffer[1] };
+#elif AI_ACTIVATION_BUFFERS_COUNT == 3
+  const stai_ptr acts[] = { activation_buffer[0], activation_buffer[1], activation_buffer[2] };
+#endif
+
+  err = stai_network_set_activations(network, acts, AI_ACTIVATION_BUFFERS_COUNT);
+  assert(err == STAI_SUCCESS);
+
+  err = stai_network_get_inputs(network, inputs_buff_Ptr, &ai_input_size);
+  assert(err == STAI_SUCCESS);
+
+  err = stai_network_get_outputs(network, outputs_buff_Ptr, &ai_output_size);
+  assert(err == STAI_SUCCESS);
 }
 
 /**
  * @brief De-initializes the generated C model for a neural network
  */
-void ai_deinit(void) { ai_network_destroy(network_handle); }
+void ai_deinit(void)
+{
+  stai_network_deinit(network);
+}
 
 /**
  * @brief  Run an inference of the generated C model for a neural network
- * @param  input   Pointer to the buffer containing the inference input data
- * @param  output  Pointer to the buffer for the inference output data
  */
-void ai_run(void* input, void** output)
+void ai_run(void)
 {
-  ai_i32 nbatch;
-  ai_input[0].data = AI_HANDLE_PTR(input);
-  for (uint8_t i = 0; i < AI_NETWORK_OUT_NUM; i++)
-  {
-    ai_output[i].data = AI_HANDLE_PTR(output[i]);
-  }
-  nbatch = ai_network_run(network_handle, &ai_input[0], &ai_output[0]);
-  
-  if (nbatch != 1) {
-        while(1);
-  }
+  stai_return_code err;
+  err = stai_network_run(network, STAI_MODE_SYNC);
+  assert(err == STAI_SUCCESS);
 }
 

@@ -100,11 +100,6 @@
 			<locationURI>PARENT-3-PROJECT_LOC/Network/Src/network_data.c</locationURI>
 		</link>
 		<link>
-			<name>Application/Network/network_data_params.c</name>
-			<type>1</type>
-			<locationURI>PARENT-3-PROJECT_LOC/Network/Src/network_data_params.c</locationURI>
-		</link>
-		<link>
 			<name>Application/STM32CubeIDE/startup_cm4.s</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/startup_cm4.s</locationURI>

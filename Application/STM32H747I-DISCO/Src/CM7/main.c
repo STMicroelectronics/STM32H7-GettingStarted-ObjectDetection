@@ -52,32 +52,32 @@ uint8_t RescaledImage_Buffer[RESCALED_FRAME_BUFFER_SIZE];
  /***Buffer to store the NN input frame***/
 __attribute__((section(".NN_InputImage_Buffer")))
 __attribute__ ((aligned (32)))
-#ifdef AI_NETWORK_INPUTS_IN_ACTIVATIONS
- uint8_t *NN_InputImage_Buffer=NULL;
-#else 
- uint8_t NN_InputImage_Buffer[AI_INPUT_BUFFER_SIZE];
-#endif 
- 
+#if (STAI_NETWORK_FLAGS & STAI_FLAG_INPUTS) == STAI_FLAG_INPUTS /* if inputs are allocated in activations */
+ uint8_t* NN_InputImage_Buffer[STAI_NETWORK_IN_NUM] = {NULL};
+#else
+  #error "NN Output buffer must be allocated in Activations; Not managed in this example"
+#endif
+
  /***Buffer to store the NN ouput data***/
 __attribute__((section(".NN_OutputData_Buffer")))
 __attribute__ ((aligned (32)))
-#ifdef AI_NETWORK_OUTPUTS_IN_ACTIVATIONS
- uint8_t *NN_OutputData_Buffer=NULL;
-#else 
- uint8_t NN_OutputData_Buffer[AI_OUTPUT_BUFFER_SIZE]= {0};
-#endif 
-  
+#if (STAI_NETWORK_FLAGS & STAI_FLAG_OUTPUTS) == STAI_FLAG_OUTPUTS /* if outputs are allocated in activations */
+ uint8_t* NN_OutputData_Buffer[STAI_NETWORK_OUT_NUM] = {NULL};
+#else
+  #error "NN Output buffer must be allocated in Activations; Not managed in this example"
+#endif
+
  /***Buffer to store the NN Activation data***/
  /*** @GENERATED CODE START - DO NOT TOUCH@ ***/
 __attribute__((section(".NN_Activation_Buffer_AXIRAM")))
 __attribute__ ((aligned (32)))
 static uint8_t NN_Activation_Buffer_AXIRAM[AI_ACTIVATION_1_SIZE_BYTES + 32 - (AI_ACTIVATION_1_SIZE_BYTES%32)];
-ai_handle NN_Activation_Buffer[AI_ACTIVATION_BUFFERS_COUNT] = { NN_Activation_Buffer_AXIRAM, };
+uint8_t* NN_Activation_Buffer[AI_ACTIVATION_BUFFERS_COUNT] = { NN_Activation_Buffer_AXIRAM, };
 
  /*** @GENERATED CODE STOP - DO NOT TOUCH@ ***/
 
  /***Buffer to store the LCD display in external SDRAM***/
- 
+
 
 /*
  * LCD display buffers in external SDRAM
@@ -121,25 +121,25 @@ int main(void)
 {
   /* System Init, System clock, voltage scaling and L1-Cache configuration are done by CPU1 (Cortex-M7)
   in the meantime Domain D2 is put in STOP mode(Cortex-M4 in deep-sleep) */
-  
+
   /* Configure the MPU attributes */
   MPU_Config();
-  
+
   /* Enable the CPU Cache */
   CPU_CACHE_Enable();
-  
+
   /* Initialize the HAL Library */
   HAL_Init();
-  
+
   /* Configure the system clock to 400 MHz */
   SystemClock_Config();
-  
+
   /* Enable CRC HW IP block */
   __HAL_RCC_CRC_CLK_ENABLE();
-  
+
   /* Perfom SW configuration related to the application  */
   Software_Init(&App_Config);
-  
+
   /* Perfom HW configuration (display, camera) related to the application  */
   Hardware_Init(&App_Config);
 
@@ -149,7 +149,7 @@ int main(void)
   init.InterfaceMode=MT25TL01G_QPI_MODE;
   init.TransferRate= MT25TL01G_DTR_TRANSFER ;
   init.DualFlashMode= MT25TL01G_DUALFLASH_ENABLE;
-  
+
   /* Initialize the NOR QuadSPI flash */
   if (BSP_QSPI_Init(0, &init) != BSP_ERROR_NONE)
   {
@@ -165,45 +165,45 @@ int main(void)
 
   /* Display welcome message */
   Display_WelcomeScreen(&App_Config);
-  
+
   while(1)
   {
     /**************************************************************************/
     /**************Wait for the next frame to be ready for processing**********/
-    /**************************************************************************/ 
+    /**************************************************************************/
     Camera_GetNextReadyFrame(&App_Config);
-    
+
     /**************************************************************************/
     /********************Dispaly camera frame into LCD display*****************/
-    /**************************************************************************/ 
+    /**************************************************************************/
     Display_CameraPreview(&App_Config);
-    
+
     /**************************************************************************/
     /**************************Run Frame Preprocessing*************************/
-    /**************************************************************************/  
+    /**************************************************************************/
     Network_Preprocess(&App_Config);
-    
+
     /**************************************************************************/
     /***Launch camera capture of next frame in // of current frame inference***/
-    /**************************************************************************/ 
+    /**************************************************************************/
     Camera_StartNewFrameAcquisition(&App_Config);
-    
+
     /**************************************************************************/
     /****************************Run NN Inference******************************/
     /**************************************************************************/
     Network_Inference(&App_Config);
-    
+
     /**************************************************************************/
     /*************************Run post process operations**********************/
-    /**************************************************************************/    
-    Network_Postprocess(&App_Config);  
-    
+    /**************************************************************************/
+    Network_Postprocess(&App_Config);
+
     /**************************************************************************/
     /*****************Display Inference output results and FPS*****************/
-    /**************************************************************************/ 
+    /**************************************************************************/
     Display_NetworkOutput(&App_Config);
   }
-  
+
   /* End of program */
 }
 
@@ -216,29 +216,29 @@ static void Software_Init(AppConfig_TypeDef *App_Config_Ptr)
 {
   App_Config_Ptr->mirror_flip=CAMERA_MIRRORFLIP_FLIP;
   App_Config_Ptr->new_frame_ready=0;
- 
+
   App_Config_Ptr->lcd_sync=0;
-  
+
   App_Config_Ptr->lut=pixel_conv_lut;
-  
+
   App_Config_Ptr->nn_input_type= QUANT_INPUT_TYPE;
   App_Config_Ptr->nn_output_type= QUANT_OUTPUT_TYPE;
 
   App_Config_Ptr->nn_output_labels=classes_table;
-  
+
   /*Preproc*/
 #if PP_COLOR_MODE == RGB_FORMAT
   App_Config_Ptr->red_blue_swap = 1; /* See UM2611 section 3.2.6 Pixel data order */
 #else
   App_Config_Ptr->red_blue_swap = 0;
 #endif
-  
+
 #if PP_COLOR_MODE == GRAYSCALE_FORMAT
   App_Config_Ptr->PixelFormatConv=SW_PFC;
 #else
   App_Config_Ptr->PixelFormatConv=HW_PFC;
 #endif
-  
+
   /*Postproc initialization*/
   App_Config_Ptr->error = AI_OBJDETECT_POSTPROCESS_ERROR_NO;
 
@@ -255,16 +255,24 @@ static void Software_Init(AppConfig_TypeDef *App_Config_Ptr)
   }
 
   /*Memory buffer init*/
-  App_Config_Ptr->nn_input_buffer = NN_InputImage_Buffer; 
-  App_Config_Ptr->nn_output_buffer[0]=NN_OutputData_Buffer;
+  for (size_t i = 0; i < STAI_NETWORK_IN_NUM; i++)
+  {
+    App_Config_Ptr->nn_input_buffer[i] = (void*)NN_InputImage_Buffer[i];
+  }
+  for (size_t i = 0; i < STAI_NETWORK_OUT_NUM; i++)
+  {
+    App_Config_Ptr->nn_output_buffer[i] = NN_OutputData_Buffer[i];
+  }
   App_Config_Ptr->camera_capture_buffer = CapturedImage_Buffer;
   App_Config_Ptr->camera_capture_buffer_no_borders = App_Config_Ptr->camera_capture_buffer+((CAM_RES_WIDTH - CAM_RES_HEIGHT)/2)*CAM_RES_WIDTH*RGB_565_BPP;
   App_Config_Ptr->rescaled_image_buffer = RescaledImage_Buffer;
-  App_Config_Ptr->activation_buffer = NN_Activation_Buffer;
+  for (size_t i = 0; i < AI_ACTIVATION_BUFFERS_COUNT; i++)
+  {
+    App_Config_Ptr->activation_buffer[i] = NN_Activation_Buffer[i];
+  }
   App_Config_Ptr->lcd_frame_read_buff=lcd_display_global_memory;
   App_Config_Ptr->lcd_frame_write_buff=lcd_display_global_memory + SDRAM_BANK_SIZE;
   memset(App_Config_Ptr->camera_capture_buffer, 0x00, CAM_FRAME_BUFFER_SIZE);
-    
   /*Coherency purpose: clean the camera_capture_buffer area in L1 D-Cache */
   Utility_DCache_Coherency_Maintenance((void *)(App_Config_Ptr->camera_capture_buffer), CAM_FRAME_BUFFER_SIZE, CLEAN);
 
@@ -281,12 +289,12 @@ static void Hardware_Init(AppConfig_TypeDef *App_Config_Ptr)
   BSP_LED_Init(LED_ORANGE);
   BSP_LED_Init(LED_RED);
   BSP_LED_Init(LED_BLUE);
-  
+
   /*Display init*/
   Display_Init(App_Config_Ptr);
-  
+
   /*Camera init*/
-  Camera_Init(App_Config_Ptr); 
+  Camera_Init(App_Config_Ptr);
 }
 
 /**
@@ -444,9 +452,9 @@ static void MPU_Config(void)
   MPU_InitStruct.IsCacheable = MPU_ACCESS_CACHEABLE;
   MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
   MPU_InitStruct.Number = MPU_REGION_NUMBER0;
-  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL1; 
+  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL1;
   MPU_InitStruct.SubRegionDisable = 0x00;
-  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE; 
+  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
 #elif EXT_SDRAM_CACHE_ENABLED == 2
   /*External SDRAM memory: all as Write Thru:*/
   /*TEX=000, C=1, B=0*/
@@ -458,7 +466,7 @@ static void MPU_Config(void)
   MPU_InitStruct.IsCacheable = MPU_ACCESS_CACHEABLE;
   MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
   MPU_InitStruct.Number = MPU_REGION_NUMBER0;
-  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0; 
+  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
   MPU_InitStruct.SubRegionDisable = 0x00;
   MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
 #else

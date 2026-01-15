@@ -45,14 +45,14 @@
 
 
 
-#define WELCOME_MSG_0             AI_NETWORK_ORIGIN_MODEL_NAME
+#define WELCOME_MSG_0             STAI_NETWORK_ORIGIN_MODEL_NAME
 #define WELCOME_MSG_1            "Model Running in STM32 MCU internal memory"
 
-#if defined (AI_NETWORK_INPUTS_IN_ACTIVATIONS) && defined (AI_NETWORK_OUTPUTS_IN_ACTIVATIONS) 
+#if (STAI_NETWORK_FLAGS & STAI_FLAG_OUTPUTS) == STAI_FLAG_OUTPUTS && (STAI_NETWORK_FLAGS & STAI_FLAG_INPUTS) == STAI_FLAG_INPUTS
  #define WELCOME_MSG_2            "NN Input and Ouput buffers in Activation"
-#elif defined (AI_NETWORK_INPUTS_IN_ACTIVATIONS)
+#elif (STAI_NETWORK_FLAGS & STAI_FLAG_INPUTS) == STAI_FLAG_INPUTS
  #define WELCOME_MSG_2            "NN Input buffer in Activation"
-#elif defined (AI_NETWORK_OUTPUTS_IN_ACTIVATIONS)
+#elif (STAI_NETWORK_FLAGS & STAI_FLAG_OUTPUTS) == STAI_FLAG_OUTPUTS
  #define WELCOME_MSG_2            "NN Output buffer in Activation"
 #else
  #define WELCOME_MSG_2            "NN Input/Output in dedicated buffers "
@@ -166,15 +166,15 @@
 #define SW_PFC 2
 
 
-typedef enum 
+typedef enum
 {
   FRAME_CAPTURE    = 0x00,
   FRAME_RESIZE     = 0x01,
   FRAME_PFC        = 0x02,
   FRAME_PVC        = 0x03,
   FRAME_INFERENCE  = 0x04,
-  
-  APP_FRAMEOPERATION_NUM  
+
+  APP_FRAMEOPERATION_NUM
 } AppFrameOperation_TypeDef;
 
 /* Exported types ------------------------------------------------------------*/
@@ -194,36 +194,36 @@ typedef enum
 } network_postprocess_type;
 
 typedef struct
-{ 
+{
   /**NN Output**/
   uint32_t nn_inference_time;
   char const* nn_top1_output_class_name;
   float nn_top1_output_class_proba;
-  
+
   /**Camera context**/
   volatile uint8_t new_frame_ready;
   uint32_t mirror_flip;
   uint32_t cropping_enable;
-  
+
   /**Pre-Processing context**/
   uint32_t red_blue_swap;
   uint32_t PixelFormatConv;
- 
+
   /**Display context**/
   volatile uint32_t lcd_sync;
-  
+
   /**Utility context**/
   uint32_t Tinf_start;
   uint32_t Tinf_stop;
   uint32_t Tfps_start;
   uint32_t Tfps_stop;
-  
+
   /**AI NN context**/
   uint8_t* lut;
-  uint32_t nn_input_type; 
+  uint32_t nn_input_type;
   uint32_t nn_output_type;
   const char** nn_output_labels;
-  
+
   /*Post-Processing context*/
   int32_t error;
 #if POSTPROCESS_TYPE == POSTPROCESS_CENTER_NET
@@ -239,20 +239,18 @@ typedef struct
   void  *pInput;
 
   /**Application buffers**/
-  void* nn_output_buffer[AI_NETWORK_OUT_NUM];
-  void* nn_input_buffer;
-  void** activation_buffer;
+  void* nn_output_buffer[STAI_NETWORK_OUT_NUM];
+  void* nn_input_buffer[STAI_NETWORK_IN_NUM];
+  uint8_t* activation_buffer[AI_ACTIVATION_BUFFERS_COUNT];
   uint8_t* rescaled_image_buffer;
   uint8_t* camera_capture_buffer;
   uint8_t* camera_capture_buffer_no_borders;
   uint8_t *lcd_frame_read_buff;
   uint8_t *lcd_frame_write_buff;
-  
+
 }AppConfig_TypeDef;
 
 /* Exported types ------------------------------------------------------------*/
-extern void* NN_Activation_Buffer[];
-
 /* Exported constants --------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */

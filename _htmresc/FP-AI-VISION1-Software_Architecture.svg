@@ -173,11 +173,11 @@
 						x="84.22" dy="1.2em" class="st5">(</tspan>Feature-rich image processing library)</text>		</g>
 		<g id="shape105-53" v:mID="105" v:groupContext="shape" transform="translate(5.66929,-391.181)">
 			<title>Sheet.105</title>
-			<desc>STM32_AI_Runtime (Neural Network runtime library)</desc>
+			<desc>stedgeai-lib (Neural Network runtime library)</desc>
 			<v:textBlock v:margins="rect(2,2,2,2)"/>
 			<v:textRect cx="96.378" cy="484.724" width="192.76" height="51.0236"/>
 			<rect x="0" y="459.213" width="192.756" height="51.0236" class="st6"/>
-			<text x="40.36" y="481.12" class="st4" v:langID="1033"><v:paragraph v:horizAlign="1"/><v:tabList/>STM32_AI_Runtime<v:newlineChar/><tspan
+			<text x="40.36" y="481.12" class="st4" v:langID="1033"><v:paragraph v:horizAlign="1"/><v:tabList/>stedgeai-lib<v:newlineChar/><tspan
 						x="4.69" dy="1.2em" class="st5">(</tspan>Neural Network runtime library)</text>		</g>
 		<g id="shape124-57" v:mID="124" v:groupContext="shape" transform="translate(204.094,-391.181)">
 			<title>Sheet.124</title>
