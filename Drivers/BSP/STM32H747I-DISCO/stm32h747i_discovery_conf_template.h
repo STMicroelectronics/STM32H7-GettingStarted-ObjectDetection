@@ -32,11 +32,12 @@
 #define USE_BSP_COM_FEATURE                 0U
 
 /* LCD controllers defines */
+#define USE_LCD_CTRL_NT35510                0U
 #define USE_LCD_CTRL_OTM8009A               1U
 #define USE_LCD_CTRL_ADV7533                1U
 
-#define LCD_LAYER_0_ADDRESS                 0xC0000000U
-#define LCD_LAYER_1_ADDRESS                 0xC0200000U
+#define LCD_LAYER_0_ADDRESS                 0xD0000000U
+#define LCD_LAYER_1_ADDRESS                 0xD0200000U
 
 #define USE_DMA2D_TO_FILL_RGB_RECT          0U
 /* Camera sensors defines */

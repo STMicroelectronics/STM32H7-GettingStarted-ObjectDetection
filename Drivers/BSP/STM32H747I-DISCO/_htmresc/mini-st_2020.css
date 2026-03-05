@@ -1456,7 +1456,7 @@ mark.tag {
 /*
   Definitions for progress elements and spinners.
 */
-/* Progess module CSS variable definitions */
+/* Progress module CSS variable definitions */
 :root {
   --progress-back-color: #3cb4e6;
   --progress-fore-color: #555; }
